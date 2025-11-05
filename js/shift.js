@@ -13,12 +13,23 @@ async function loadShiftTab() {
 // ========================================
 async function loadVacancies() {
     try {
+        console.log('欠員シフトを読み込み中...');
         const response = await fetch('tables/shift_vacancies?limit=100&sort=shift_date');
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
         const data = await response.json();
+        console.log('取得した欠員シフトデータ:', data);
         
         displayVacancies(data.data);
     } catch (error) {
         console.error('欠員シフト読み込みエラー:', error);
+        const container = document.getElementById('shiftVacanciesList');
+        if (container) {
+            container.innerHTML = '<p style="text-align:center; color:red; padding:40px;">シフトの読み込みに失敗しました。</p>';
+        }
     }
 }
 
@@ -100,12 +111,23 @@ async function entryShift(vacancyId) {
 // ========================================
 async function loadPdfLinks() {
     try {
+        console.log('PDFリンクを読み込み中...');
         const response = await fetch('tables/shift_pdf_links?limit=100&sort=display_order');
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
         const data = await response.json();
+        console.log('取得したPDFリンクデータ:', data);
         
         displayPdfLinks(data.data);
     } catch (error) {
         console.error('PDFリンク読み込みエラー:', error);
+        const container = document.getElementById('shiftPdfLinks');
+        if (container) {
+            container.innerHTML = '<div class="no-shifts">PDFリンクの読み込みに失敗しました</div>';
+        }
     }
 }
 

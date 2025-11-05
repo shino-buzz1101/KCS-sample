@@ -68,6 +68,44 @@ async function initializeData() {
         }
     }
 
+    // 動画の投入（サンプル動画3本）
+    const sampleVideos = [
+        {
+            title: '基礎トレーニング',
+            youtube_url: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
+            thumbnail_url: '',
+            category: '基本',
+            order_num: 1
+        },
+        {
+            title: '接客マニュアル',
+            youtube_url: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
+            thumbnail_url: '',
+            category: '基本',
+            order_num: 2
+        },
+        {
+            title: '安全管理',
+            youtube_url: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
+            thumbnail_url: '',
+            category: '基本',
+            order_num: 3
+        }
+    ];
+
+    for (const video of sampleVideos) {
+        try {
+            await fetch('tables/videos', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(video)
+            });
+            console.log(`動画追加: ${video.title}`);
+        } catch (error) {
+            console.error('動画投入エラー:', error);
+        }
+    }
+
     // テスト問題の投入
     const testQuestions = [
         {
@@ -141,7 +179,16 @@ async function initializeData() {
     }
 
     console.log('✅ 初期データの投入が完了しました！');
-    alert('初期データの投入が完了しました！ページをリロードしてください。');
+    console.log('投入内容:');
+    console.log('- 動画: 3本');
+    console.log('- チェック項目: 約100項目（4カテゴリー）');
+    console.log('- テスト問題: 10問');
+    alert('✅ 初期データの投入が完了しました！\n\n投入内容:\n・動画 3本\n・チェック項目 約100項目\n・テスト問題 10問\n\nページをリロードしてください。');
+    
+    // 5秒後に自動リロード
+    setTimeout(() => {
+        window.location.reload();
+    }, 5000);
 }
 
 // ページ読み込み時に実行ボタンを表示

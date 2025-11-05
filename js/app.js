@@ -59,14 +59,37 @@ function updateUserDisplay() {
 // アプリ初期化
 // ========================================
 function initApp() {
-    initTabs();
-    loadAnnouncements(); // ホーム画面の連絡事項を読み込み
-    loadUpdates(); // ホーム画面の更新履歴を読み込み
-    loadVideos();
-    initChecklist();
-    initTest();
-    loadRankings();
-    loadAdminData();
+    console.log('=== KCSポータル初期化開始 ===');
+    console.log('現在のユーザー:', currentUser);
+    
+    try {
+        console.log('1. タブ初期化');
+        initTabs();
+        
+        console.log('2. ホーム画面データ読み込み');
+        loadAnnouncements(); // ホーム画面の連絡事項を読み込み
+        loadUpdates(); // ホーム画面の更新履歴を読み込み
+        
+        console.log('3. 動画マニュアル読み込み');
+        loadVideos();
+        
+        console.log('4. チェックシート初期化');
+        initChecklist();
+        
+        console.log('5. テスト初期化');
+        initTest();
+        
+        console.log('6. ランキング読み込み');
+        loadRankings();
+        
+        console.log('7. 管理者データ読み込み');
+        loadAdminData();
+        
+        console.log('=== 初期化完了 ===');
+    } catch (error) {
+        console.error('初期化エラー:', error);
+        alert('アプリの初期化に失敗しました。ページをリロードしてください。');
+    }
 }
 
 // ========================================
@@ -287,13 +310,27 @@ function getTimeAgo(date) {
 // ========================================
 async function loadVideos() {
     try {
+        console.log('動画データを読み込み中...');
         const response = await fetch('tables/videos?limit=100&sort=order_num');
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
         const data = await response.json();
+        console.log('取得した動画データ:', data);
+        
+        if (!data.data || data.data.length === 0) {
+            console.warn('動画データが空です');
+            document.getElementById('videoList').innerHTML = '<p style="text-align:center; color:#999; padding:40px;">動画がまだ登録されていません。<br>管理者タブから動画を追加してください。</p>';
+            return;
+        }
         
         displayVideos(data.data);
         createCategoryFilter(data.data);
     } catch (error) {
         console.error('動画の読み込みエラー:', error);
+        document.getElementById('videoList').innerHTML = '<p style="text-align:center; color:red; padding:40px;">動画の読み込みに失敗しました。<br>ページをリロードしてください。</p>';
     }
 }
 
@@ -434,8 +471,20 @@ async function initChecklist() {
 
 async function loadChecklistData() {
     try {
+        console.log('チェックリストデータを読み込み中...');
         const response = await fetch('tables/checklist_items?limit=1000&sort=order_num');
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
         const data = await response.json();
+        console.log('取得したチェックリストデータ:', data);
+        
+        if (!data.data || data.data.length === 0) {
+            console.warn('チェックリストデータが空です');
+            return;
+        }
         
         // カテゴリーごとに整理
         checklistData = {};
@@ -445,6 +494,8 @@ async function loadChecklistData() {
             }
             checklistData[item.category].push(item.item_text);
         });
+        
+        console.log('整理されたチェックリストデータ:', checklistData);
     } catch (error) {
         console.error('チェックリストデータ読み込みエラー:', error);
     }
@@ -521,14 +572,28 @@ async function initTest() {
 
 async function loadTestData() {
     try {
+        console.log('テスト問題を読み込み中...');
         const response = await fetch('tables/test_questions?limit=1000&sort=order_num');
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
         const data = await response.json();
+        console.log('取得したテスト問題データ:', data);
+        
+        if (!data.data || data.data.length === 0) {
+            console.warn('テスト問題データが空です');
+            return;
+        }
         
         testData.questions = data.data.map(q => ({
             question: q.question,
             options: JSON.parse(q.options),
             correct: q.correct_answer
         }));
+        
+        console.log('整理されたテスト問題:', testData.questions);
     } catch (error) {
         console.error('テストデータ読み込みエラー:', error);
     }
@@ -1179,13 +1244,25 @@ async function deleteAnnouncement(announcementId) {
 // ========================================
 async function loadVideoManagement() {
     try {
+        console.log('管理者：動画管理データを読み込み中...');
         const response = await fetch('tables/videos?limit=1000&sort=order_num');
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
         const data = await response.json();
+        console.log('管理者：取得した動画データ:', data);
         
         const container = document.getElementById('videoManagementList');
         
-        if (data.data.length === 0) {
-            container.innerHTML = '<p style="text-align:center; color:#999;">動画がありません</p>';
+        if (!container) {
+            console.error('videoManagementList要素が見つかりません');
+            return;
+        }
+        
+        if (!data.data || data.data.length === 0) {
+            container.innerHTML = '<p style="text-align:center; color:#999;">動画がありません。「新規動画追加」ボタンから追加してください。</p>';
             return;
         }
 
@@ -1260,26 +1337,41 @@ async function saveNewVideo() {
         return;
     }
     
+    const videoData = {
+        title: title,
+        youtube_url: url,
+        thumbnail_url: thumbnail,
+        category: category,
+        order_num: order
+    };
+    
+    console.log('動画を保存中...', videoData);
+    
     try {
-        await fetch('tables/videos', {
+        const response = await fetch('tables/videos', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                title: title,
-                youtube_url: url,
-                thumbnail_url: thumbnail,
-                category: category,
-                order_num: order
-            })
+            body: JSON.stringify(videoData)
         });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        console.log('動画保存成功:', result);
         
         alert('動画を追加しました！');
         closeEditModal();
-        loadVideoManagement();
-        loadVideos(); // メイン画面も更新
+        
+        // 両方の画面を更新
+        console.log('画面を更新中...');
+        await loadVideoManagement();
+        await loadVideos();
+        console.log('画面更新完了');
     } catch (error) {
         console.error('動画追加エラー:', error);
-        alert('動画の追加に失敗しました');
+        alert('動画の追加に失敗しました: ' + error.message);
     }
 }
 
@@ -1329,26 +1421,41 @@ async function updateVideo(videoId) {
         return;
     }
     
+    const videoData = {
+        title: title,
+        youtube_url: url,
+        thumbnail_url: thumbnail,
+        category: category,
+        order_num: order
+    };
+    
+    console.log('動画を更新中...', videoId, videoData);
+    
     try {
-        await fetch(`tables/videos/${videoId}`, {
+        const response = await fetch(`tables/videos/${videoId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                title: title,
-                youtube_url: url,
-                thumbnail_url: thumbnail,
-                category: category,
-                order_num: order
-            })
+            body: JSON.stringify(videoData)
         });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        console.log('動画更新成功:', result);
         
         alert('動画を更新しました！');
         closeEditModal();
-        loadVideoManagement();
-        loadVideos(); // メイン画面も更新
+        
+        // 両方の画面を更新
+        console.log('画面を更新中...');
+        await loadVideoManagement();
+        await loadVideos();
+        console.log('画面更新完了');
     } catch (error) {
         console.error('動画更新エラー:', error);
-        alert('動画の更新に失敗しました');
+        alert('動画の更新に失敗しました: ' + error.message);
     }
 }
 
