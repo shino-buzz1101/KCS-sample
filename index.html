@@ -44,20 +44,17 @@
             <button class="tab-btn active" data-tab="home">
                 <i class="fas fa-home"></i> ホーム
             </button>
+            <button class="tab-btn" data-tab="shift">
+                <i class="fas fa-calendar-alt"></i> シフト
+            </button>
             <button class="tab-btn" data-tab="videos">
                 <i class="fas fa-video"></i> 動画マニュアル
             </button>
             <button class="tab-btn" data-tab="checklist">
                 <i class="fas fa-clipboard-check"></i> チェックシート
             </button>
-            <button class="tab-btn" data-tab="test">
-                <i class="fas fa-pencil-alt"></i> テスト
-            </button>
             <button class="tab-btn" data-tab="ranking">
                 <i class="fas fa-trophy"></i> ランキング
-            </button>
-            <button class="tab-btn" data-tab="shift">
-                <i class="fas fa-calendar-alt"></i> シフト
             </button>
             <button class="tab-btn" data-tab="admin">
                 <i class="fas fa-user-shield"></i> 管理者
@@ -122,23 +119,10 @@
         </div>
 
         <!-- テストタブ -->
-        <div id="test" class="tab-content">
-            <h2><i class="fas fa-pencil-alt"></i> テスト</h2>
-            <form id="testForm" class="test-form">
-                <div id="testQuestions"></div>
-                <button type="submit" class="btn-primary">テスト送信</button>
-            </form>
-            <div id="testResult" class="test-result" style="display:none;"></div>
-        </div>
-
         <!-- ランキングタブ -->
         <div id="ranking" class="tab-content">
             <h2><i class="fas fa-trophy"></i> ランキング</h2>
             <div class="ranking-container">
-                <div class="ranking-section">
-                    <h3><i class="fas fa-pencil-alt"></i> テストチャレンジ数ランキング</h3>
-                    <div id="testRanking" class="ranking-list"></div>
-                </div>
                 <div class="ranking-section">
                     <h3><i class="fas fa-video"></i> 動画視聴回数ランキング</h3>
                     <div id="videoRanking" class="ranking-list"></div>
@@ -174,7 +158,6 @@
                 <button class="admin-tab-btn" onclick="switchAdminTab('shift')">シフト管理</button>
                 <button class="admin-tab-btn" onclick="switchAdminTab('videos')">動画管理</button>
                 <button class="admin-tab-btn" onclick="switchAdminTab('checklist')">チェック項目管理</button>
-                <button class="admin-tab-btn" onclick="switchAdminTab('test')">テスト問題管理</button>
             </div>
 
             <!-- データ確認タブ -->
@@ -185,14 +168,6 @@
                         <i class="fas fa-download"></i> CSV出力
                     </button>
                     <div id="adminChecklistData" class="data-table"></div>
-                </div>
-
-                <div class="admin-section">
-                    <h3><i class="fas fa-pencil-alt"></i> テスト結果</h3>
-                    <button class="btn-export" onclick="exportTestCSV()">
-                        <i class="fas fa-download"></i> CSV出力
-                    </button>
-                    <div id="adminTestData" class="data-table"></div>
                 </div>
 
                 <div class="admin-section">
@@ -265,15 +240,7 @@
             </div>
 
             <!-- テスト問題管理タブ -->
-            <div id="adminTest" class="admin-tab-content">
-                <div class="admin-section">
-                    <h3><i class="fas fa-question-circle"></i> テスト問題管理</h3>
-                    <button class="btn-primary" onclick="showAddTestQuestionModal()">
-                        <i class="fas fa-plus"></i> 新規問題追加
-                    </button>
-                    <div id="testQuestionManagementList" class="management-list"></div>
-                </div>
-            </div>
+
         </div>
     </main>
 

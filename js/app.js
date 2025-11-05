@@ -306,6 +306,48 @@ function getTimeAgo(date) {
 }
 
 // ========================================
+// YouTube埋め込みコード処理
+// ========================================
+function parseYouTubeEmbed(embedCode) {
+    // 埋め込みコードまたはURLからYouTube情報を抽出
+    let videoId = '';
+    let embedUrl = '';
+    
+    // iframeタグから抽出
+    const iframeMatch = embedCode.match(/<iframe[^>]+src=["']([^"']+)["']/i);
+    if (iframeMatch) {
+        embedUrl = iframeMatch[1];
+    } else {
+        // URLが直接入力された場合
+        embedUrl = embedCode.trim();
+    }
+    
+    // Video IDを抽出
+    const embedIdMatch = embedUrl.match(/\/embed\/([a-zA-Z0-9_-]+)/);
+    const watchIdMatch = embedUrl.match(/[?&]v=([a-zA-Z0-9_-]+)/);
+    const shortIdMatch = embedUrl.match(/youtu\.be\/([a-zA-Z0-9_-]+)/);
+    
+    if (embedIdMatch) {
+        videoId = embedIdMatch[1];
+    } else if (watchIdMatch) {
+        videoId = watchIdMatch[1];
+    } else if (shortIdMatch) {
+        videoId = shortIdMatch[1];
+    }
+    
+    // 標準化されたembed URLを生成
+    if (videoId) {
+        embedUrl = `https://www.youtube.com/embed/${videoId}`;
+    }
+    
+    return {
+        videoId: videoId,
+        embedUrl: embedUrl,
+        thumbnailUrl: videoId ? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg` : ''
+    };
+}
+
+// ========================================
 // 動画マニュアル機能
 // ========================================
 async function loadVideos() {
@@ -1298,14 +1340,19 @@ function showAddVideoModal() {
         <label>動画タイトル</label>
         <input type="text" id="videoTitle" placeholder="動画のタイトル">
         
-        <label>YouTube埋め込みURL</label>
-        <input type="text" id="videoUrl" placeholder="https://www.youtube.com/embed/...">
-        <p style="font-size: 12px; color: #666; margin-top: -10px;">
-            ※ YouTubeで「共有」→「埋め込む」からURLをコピーしてください
-        </p>
+        <label>YouTube埋め込みコード / URL</label>
+        <textarea id="videoEmbedCode" rows="4" placeholder="YouTubeの埋め込みコードまたはURLをペースト&#10;&#10;例1: <iframe src='https://www.youtube.com/embed/xxxxx'...>&#10;例2: https://www.youtube.com/watch?v=xxxxx&#10;例3: https://youtu.be/xxxxx"></textarea>
+        <button type="button" class="btn-secondary" onclick="previewVideo()" style="margin-top: 10px; width: 100%;">
+            <i class="fas fa-eye"></i> プレビュー
+        </button>
         
-        <label>サムネイルURL（オプション）</label>
-        <input type="text" id="videoThumbnail" placeholder="https://example.com/thumbnail.jpg">
+        <div id="videoPreview" style="display: none; margin-top: 15px; background: #f0f0f0; padding: 15px; border-radius: 10px;">
+            <p style="font-weight: 600; margin-bottom: 10px;">プレビュー：</p>
+            <div id="videoPreviewFrame" style="position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; border-radius: 8px;"></div>
+        </div>
+        
+        <label style="margin-top: 15px;">カスタムサムネイルURL（オプション）</label>
+        <input type="text" id="videoThumbnail" placeholder="独自のサムネイル画像URL">
         <p style="font-size: 12px; color: #666; margin-top: -10px;">
             ※ 空欄の場合はYouTubeのデフォルトサムネイルを使用
         </p>
@@ -1325,22 +1372,64 @@ function showAddVideoModal() {
     modal.style.display = 'flex';
 }
 
-async function saveNewVideo() {
-    const title = document.getElementById('videoTitle').value.trim();
-    const url = document.getElementById('videoUrl').value.trim();
-    const thumbnail = document.getElementById('videoThumbnail').value.trim();
-    const category = document.getElementById('videoCategory').value.trim();
-    const order = parseInt(document.getElementById('videoOrder').value);
+// プレビュー機能
+function previewVideo() {
+    const embedCode = document.getElementById('videoEmbedCode').value.trim();
+    const previewContainer = document.getElementById('videoPreview');
+    const previewFrame = document.getElementById('videoPreviewFrame');
     
-    if (!title || !url || !category) {
-        alert('タイトル、URL、カテゴリーを入力してください');
+    if (!embedCode) {
+        alert('埋め込みコードまたはURLを入力してください');
         return;
     }
     
+    const parsed = parseYouTubeEmbed(embedCode);
+    
+    if (!parsed.videoId) {
+        alert('有効なYouTube URLが見つかりませんでした。\n\n対応形式:\n・埋め込みコード (<iframe...>)\n・通常URL (youtube.com/watch?v=...)\n・短縮URL (youtu.be/...)');
+        return;
+    }
+    
+    // プレビューを表示
+    previewFrame.innerHTML = `
+        <iframe src="${parsed.embedUrl}" 
+                style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"
+                allowfullscreen 
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture">
+        </iframe>
+    `;
+    previewContainer.style.display = 'block';
+    
+    console.log('プレビュー表示:', parsed);
+}
+
+async function saveNewVideo() {
+    const title = document.getElementById('videoTitle').value.trim();
+    const embedCode = document.getElementById('videoEmbedCode').value.trim();
+    const customThumbnail = document.getElementById('videoThumbnail').value.trim();
+    const category = document.getElementById('videoCategory').value.trim();
+    const order = parseInt(document.getElementById('videoOrder').value);
+    
+    if (!title || !embedCode || !category) {
+        alert('タイトル、埋め込みコード、カテゴリーを入力してください');
+        return;
+    }
+    
+    // YouTube埋め込みコードをパース
+    const parsed = parseYouTubeEmbed(embedCode);
+    
+    if (!parsed.videoId) {
+        alert('有効なYouTube URLが見つかりませんでした。\n\n対応形式:\n・埋め込みコード (<iframe...>)\n・通常URL (youtube.com/watch?v=...)\n・短縮URL (youtu.be/...)');
+        return;
+    }
+    
+    // サムネイルはカスタム指定があればそれを、なければYouTubeのデフォルトを使用
+    const thumbnailUrl = customThumbnail || parsed.thumbnailUrl;
+    
     const videoData = {
         title: title,
-        youtube_url: url,
-        thumbnail_url: thumbnail,
+        youtube_url: parsed.embedUrl,
+        thumbnail_url: thumbnailUrl,
         category: category,
         order_num: order
     };
@@ -1385,11 +1474,19 @@ function editVideo(video) {
         <label>動画タイトル</label>
         <input type="text" id="videoTitle" value="${video.title}">
         
-        <label>YouTube埋め込みURL</label>
-        <input type="text" id="videoUrl" value="${video.youtube_url}">
+        <label>YouTube埋め込みコード / URL</label>
+        <textarea id="videoEmbedCode" rows="4" placeholder="YouTubeの埋め込みコードまたはURLをペースト&#10;&#10;例1: <iframe src='https://www.youtube.com/embed/xxxxx'...>&#10;例2: https://www.youtube.com/watch?v=xxxxx&#10;例3: https://youtu.be/xxxxx">${video.youtube_url}</textarea>
+        <button type="button" class="btn-secondary" onclick="previewVideo()" style="margin-top: 10px; width: 100%;">
+            <i class="fas fa-eye"></i> プレビュー
+        </button>
         
-        <label>サムネイルURL（オプション）</label>
-        <input type="text" id="videoThumbnail" value="${video.thumbnail_url || ''}" placeholder="https://example.com/thumbnail.jpg">
+        <div id="videoPreview" style="display: none; margin-top: 15px; background: #f0f0f0; padding: 15px; border-radius: 10px;">
+            <p style="font-weight: 600; margin-bottom: 10px;">プレビュー：</p>
+            <div id="videoPreviewFrame" style="position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; border-radius: 8px;"></div>
+        </div>
+        
+        <label style="margin-top: 15px;">カスタムサムネイルURL（オプション）</label>
+        <input type="text" id="videoThumbnail" value="${video.thumbnail_url || ''}" placeholder="独自のサムネイル画像URL">
         <p style="font-size: 12px; color: #666; margin-top: -10px;">
             ※ 空欄の場合はYouTubeのデフォルトサムネイルを使用
         </p>
@@ -1411,20 +1508,31 @@ function editVideo(video) {
 
 async function updateVideo(videoId) {
     const title = document.getElementById('videoTitle').value.trim();
-    const url = document.getElementById('videoUrl').value.trim();
-    const thumbnail = document.getElementById('videoThumbnail').value.trim();
+    const embedCode = document.getElementById('videoEmbedCode').value.trim();
+    const customThumbnail = document.getElementById('videoThumbnail').value.trim();
     const category = document.getElementById('videoCategory').value.trim();
     const order = parseInt(document.getElementById('videoOrder').value);
     
-    if (!title || !url || !category) {
-        alert('タイトル、URL、カテゴリーを入力してください');
+    if (!title || !embedCode || !category) {
+        alert('タイトル、埋め込みコード、カテゴリーを入力してください');
         return;
     }
     
+    // YouTube埋め込みコードをパース
+    const parsed = parseYouTubeEmbed(embedCode);
+    
+    if (!parsed.videoId) {
+        alert('有効なYouTube URLが見つかりませんでした。\n\n対応形式:\n・埋め込みコード (<iframe...>)\n・通常URL (youtube.com/watch?v=...)\n・短縮URL (youtu.be/...)');
+        return;
+    }
+    
+    // サムネイルはカスタム指定があればそれを、なければYouTubeのデフォルトを使用
+    const thumbnailUrl = customThumbnail || parsed.thumbnailUrl;
+    
     const videoData = {
         title: title,
-        youtube_url: url,
-        thumbnail_url: thumbnail,
+        youtube_url: parsed.embedUrl,
+        thumbnail_url: thumbnailUrl,
         category: category,
         order_num: order
     };

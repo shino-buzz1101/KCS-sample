@@ -1110,6 +1110,17 @@ main {
     font-style: italic;
 }
 
+.vacancy-count {
+    background: #f0f0f0;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--color-dark);
+    margin-bottom: 15px;
+    display: inline-block;
+}
+
 .vacancy-entry-btn {
     width: 100%;
     padding: 12px;

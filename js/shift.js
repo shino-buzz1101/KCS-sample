@@ -36,50 +36,68 @@ async function loadVacancies() {
 async function displayVacancies(vacancies) {
     const container = document.getElementById('shiftVacanciesList');
     
-    if (vacancies.length === 0) {
+    if (!container) {
+        console.error('shiftVacanciesList要素が見つかりません');
+        return;
+    }
+    
+    if (!vacancies || vacancies.length === 0) {
         container.innerHTML = '<div class="no-shifts">現在、欠員シフトはありません</div>';
         return;
     }
 
-    // 各シフトのエントリー状況を取得
-    const vacanciesWithEntries = await Promise.all(vacancies.map(async (vacancy) => {
-        const entriesRes = await fetch(`tables/shift_entries?limit=100`);
+    try {
+        // 全エントリーを一度に取得（効率化）
+        const entriesRes = await fetch('tables/shift_entries?limit=1000');
         const entriesData = await entriesRes.json();
-        const entries = entriesData.data.filter(e => e.vacancy_id === vacancy.id);
-        return { ...vacancy, entries };
-    }));
-
-    container.innerHTML = vacanciesWithEntries.map(vacancy => {
-        const date = new Date(vacancy.shift_date).toLocaleDateString('ja-JP', {
-            month: 'long',
-            day: 'numeric',
-            weekday: 'short'
+        const allEntries = entriesData.data || [];
+        
+        // 各シフトのエントリー状況を追加
+        const vacanciesWithEntries = vacancies.map(vacancy => {
+            const entries = allEntries.filter(e => e.vacancy_id === vacancy.id);
+            return { ...vacancy, entries };
         });
-        
-        const hasEntry = vacancy.entries.some(e => e.user_name === currentUser);
-        const isFilled = vacancy.is_filled;
-        
-        return `
-            <div class="vacancy-card ${isFilled ? 'filled' : ''}">
-                <div class="vacancy-header">
-                    <div class="vacancy-date">${date}</div>
-                    <div class="vacancy-wage">¥${vacancy.hourly_wage.toLocaleString()}/時</div>
+
+        container.innerHTML = vacanciesWithEntries.map(vacancy => {
+            const date = new Date(vacancy.shift_date).toLocaleDateString('ja-JP', {
+                month: 'long',
+                day: 'numeric',
+                weekday: 'short'
+            });
+            
+            const hasEntry = vacancy.entries.some(e => e.user_name === currentUser);
+            const isFilled = vacancy.is_filled;
+            const requiredCount = vacancy.required_count || 1;
+            const entryCount = vacancy.entries.length;
+            
+            return `
+                <div class="vacancy-card ${isFilled ? 'filled' : ''}">
+                    <div class="vacancy-header">
+                        <div class="vacancy-date">${date}</div>
+                        <div class="vacancy-wage">¥${vacancy.hourly_wage.toLocaleString()}/時</div>
+                    </div>
+                    <div class="vacancy-time">⏰ ${vacancy.time_slot}</div>
+                    <div class="vacancy-job">📋 ${vacancy.job_description}</div>
+                    ${vacancy.notes ? `<div class="vacancy-notes">💬 ${vacancy.notes}</div>` : ''}
+                    <div class="vacancy-count">
+                        <i class="fas fa-users"></i> 募集：${requiredCount}名 | エントリー：${entryCount}名
+                    </div>
+                    
+                    ${hasEntry 
+                        ? '<div class="vacancy-entry-info">✓ エントリー済み</div>'
+                        : isFilled
+                        ? '<button class="vacancy-entry-btn" disabled>募集終了</button>'
+                        : `<button class="vacancy-entry-btn" onclick="entryShift('${vacancy.id}')">
+                            <i class="fas fa-hand-paper"></i> エントリーする
+                           </button>`
+                    }
                 </div>
-                <div class="vacancy-time">⏰ ${vacancy.time_slot}</div>
-                <div class="vacancy-job">📋 ${vacancy.job_description}</div>
-                ${vacancy.notes ? `<div class="vacancy-notes">💬 ${vacancy.notes}</div>` : ''}
-                
-                ${hasEntry 
-                    ? '<div class="vacancy-entry-info">✓ エントリー済み</div>'
-                    : isFilled
-                    ? '<button class="vacancy-entry-btn" disabled>募集終了</button>'
-                    : `<button class="vacancy-entry-btn" onclick="entryShift('${vacancy.id}')">
-                        <i class="fas fa-hand-paper"></i> エントリーする
-                       </button>`
-                }
-            </div>
-        `;
-    }).join('');
+            `;
+        }).join('');
+    } catch (error) {
+        console.error('エントリー情報取得エラー:', error);
+        container.innerHTML = '<p style="text-align:center; color:red; padding:40px;">エントリー情報の読み込みに失敗しました。</p>';
+    }
 }
 
 async function entryShift(vacancyId) {
@@ -172,6 +190,8 @@ async function loadVacancyManagement() {
         container.innerHTML = vacanciesData.data.map(vacancy => {
             const entries = entriesData.data.filter(e => e.vacancy_id === vacancy.id);
             const entryNames = entries.map(e => e.user_name).join(', ');
+            const requiredCount = vacancy.required_count || 1;
+            const entryCount = entries.length;
             
             return `
                 <div class="management-item">
@@ -180,13 +200,14 @@ async function loadVacancyManagement() {
                         <p>${vacancy.job_description}</p>
                         <p style="font-size: 14px; color: #666;">
                             時給: ¥${vacancy.hourly_wage.toLocaleString()} | 
+                            募集: ${requiredCount}名 | 
                             ${vacancy.is_filled ? '募集終了' : '募集中'}
                         </p>
                         ${entries.length > 0 
                             ? `<p style="font-size: 14px; color: var(--color-success); font-weight: 600;">
-                                エントリー: ${entryNames} (${entries.length}名)
+                                エントリー: ${entryNames} (${entryCount}/${requiredCount}名)
                                </p>`
-                            : '<p style="font-size: 14px; color: #999;">エントリーなし</p>'
+                            : `<p style="font-size: 14px; color: #999;">エントリーなし (0/${requiredCount}名)</p>`
                         }
                     </div>
                     <div class="management-item-actions">
@@ -227,6 +248,9 @@ function showAddVacancyModal() {
         <label>時給（円）</label>
         <input type="number" id="vacancyWage" placeholder="1200" min="0">
         
+        <label>募集人数</label>
+        <input type="number" id="vacancyRequiredCount" value="1" min="1" placeholder="1">
+        
         <div class="btn-group">
             <button class="btn-secondary" onclick="closeEditModal()">キャンセル</button>
             <button class="btn-primary" onclick="saveNewVacancy()">保存</button>
@@ -242,14 +266,20 @@ async function saveNewVacancy() {
     const job = document.getElementById('vacancyJob').value.trim();
     const notes = document.getElementById('vacancyNotes').value.trim();
     const wage = parseInt(document.getElementById('vacancyWage').value);
+    const requiredCount = parseInt(document.getElementById('vacancyRequiredCount').value) || 1;
     
     if (!date || !time || !job || !wage) {
         alert('日付、時間帯、業務内容、時給を入力してください');
         return;
     }
     
+    if (requiredCount < 1) {
+        alert('募集人数は1名以上で入力してください');
+        return;
+    }
+    
     try {
-        await fetch('tables/shift_vacancies', {
+        const response = await fetch('tables/shift_vacancies', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -258,18 +288,23 @@ async function saveNewVacancy() {
                 job_description: job,
                 notes: notes,
                 hourly_wage: wage,
+                required_count: requiredCount,
                 is_filled: false,
                 created_at: new Date().toISOString()
             })
         });
         
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
         alert('欠員シフトを追加しました！');
         closeEditModal();
-        loadVacancyManagement();
-        loadVacancies(); // スタッフ画面も更新
+        await loadVacancyManagement();
+        await loadVacancies(); // スタッフ画面も更新
     } catch (error) {
         console.error('欠員シフト追加エラー:', error);
-        alert('欠員シフトの追加に失敗しました');
+        alert('欠員シフトの追加に失敗しました: ' + error.message);
     }
 }
 
@@ -295,6 +330,9 @@ function editVacancy(vacancy) {
         <label>時給（円）</label>
         <input type="number" id="vacancyWage" value="${vacancy.hourly_wage}" min="0">
         
+        <label>募集人数</label>
+        <input type="number" id="vacancyRequiredCount" value="${vacancy.required_count || 1}" min="1">
+        
         <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
             <input type="checkbox" id="vacancyFilled" ${vacancy.is_filled ? 'checked' : ''} style="width: auto;">
             <span>募集終了にする</span>
@@ -315,6 +353,7 @@ async function updateVacancy(vacancyId) {
     const job = document.getElementById('vacancyJob').value.trim();
     const notes = document.getElementById('vacancyNotes').value.trim();
     const wage = parseInt(document.getElementById('vacancyWage').value);
+    const requiredCount = parseInt(document.getElementById('vacancyRequiredCount').value) || 1;
     const isFilled = document.getElementById('vacancyFilled').checked;
     
     if (!date || !time || !job || !wage) {
@@ -322,8 +361,13 @@ async function updateVacancy(vacancyId) {
         return;
     }
     
+    if (requiredCount < 1) {
+        alert('募集人数は1名以上で入力してください');
+        return;
+    }
+    
     try {
-        await fetch(`tables/shift_vacancies/${vacancyId}`, {
+        const response = await fetch(`tables/shift_vacancies/${vacancyId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -332,18 +376,23 @@ async function updateVacancy(vacancyId) {
                 job_description: job,
                 notes: notes,
                 hourly_wage: wage,
+                required_count: requiredCount,
                 is_filled: isFilled,
                 created_at: new Date().toISOString()
             })
         });
         
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
         alert('欠員シフトを更新しました！');
         closeEditModal();
-        loadVacancyManagement();
-        loadVacancies(); // スタッフ画面も更新
+        await loadVacancyManagement();
+        await loadVacancies(); // スタッフ画面も更新
     } catch (error) {
         console.error('欠員シフト更新エラー:', error);
-        alert('欠員シフトの更新に失敗しました');
+        alert('欠員シフトの更新に失敗しました: ' + error.message);
     }
 }
 
